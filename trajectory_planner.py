@@ -38,6 +38,16 @@ class TrajectoryPoint:
         return "{:.3f}s ({:.3f}, {:.3f}), heading = {:.6f}, velocity = {:.2f}".format(
             self.time_from_start, self.x, self.y, self.heading_rad, self.longitudinal_velocity_mps)
 
+starting_point = TrajectoryPoint(longitudinal_velocity_mps=3.0) 
+length = 100.0
+discretization_m = 1.0
+speed_max = 35.0
+speed_increments = 0.33
+stopping_decl = 3.0
+heading_rate = 0.0
+heading_rate_max = 1.0
+heading_rate_increments = 0.0001
+
 def create_curved_trajectory(
         init_point, 
         length, discretization_m,
@@ -117,53 +127,7 @@ def create_curved_trajectory(
             prev_heading_angle = heading_angle
             prev_speed = speed
 
-        return trajectory_msg
-
-# define velocity of points using 4 colours
-def get_colour(this_speed, min_speed, _25_speed, _50_speed,
-    _75_speed, max_speed):
-    _stationary_colour = (0, 204/256, 102/256)
-    min_colour = (255/256, 204/256, 204/256)
-    _25_colour = (255/256, 102/256, 102/256)
-    _50_colour = (255/256, 0, 0)
-    _75_colour = (153/256, 0, 0)
-    max_colour = (51/256, 0, 0)
-
-    if this_speed == 0:
-        return _stationary_colour
-    offset_min = abs(this_speed - min_speed)
-    offset_25 = abs(this_speed - _25_speed) 
-    offset_50 = abs(this_speed - _50_speed)
-    offset_75 = abs(this_speed - _75_speed)
-    offset_100 = abs(this_speed - max_speed)
-    smallest_offset = min(offset_min, offset_25, offset_50, 
-        offset_75, offset_100)
-    
-    if smallest_offset == offset_min:
-        return min_colour
-    elif smallest_offset == offset_25:
-        return _25_colour
-    elif smallest_offset == offset_50:
-        return _50_colour
-    elif smallest_offset == offset_75:
-        return _75_colour
-    else:
-        return max_colour
-
-def to_colours(velocity_arr):
-    colours = []
-    min_vel = np.percentile(velocity_arr, 0)
-    _25_vel = np.percentile(velocity_arr, 25)
-    _50_vel = np.percentile(velocity_arr, 50)
-    _75_vel = np.percentile(velocity_arr, 75)
-    max_vel = np.percentile(velocity_arr, 100)  
-
-    for i in range(0, len(velocity_arr)):
-        colour = get_colour(velocity_arr[i], min_vel, _25_vel, 
-            _50_vel, _75_vel, max_vel)
-        colours.append(colour)
-    
-    return colours      
+        return trajectory_msg     
 
 fig, ax = plt.subplots()
 
@@ -195,19 +159,22 @@ def plot_trajectory(trajectory):
     y = np.array(y)
     vel = np.array(vel)
     time = np.array(time)
-    colours = to_colours(vel)
 
-    ax.axis('equal')
-    sc = ax.scatter(x=x, y=y, c=colours)
+    ax.set_ylim(-60,60)
+    fig.set_size_inches(14, 9)
+    sc = plt.scatter(x=x, y=y, c=vel, cmap="copper_r", vmin=0, vmax=50)
+    cbar = plt.colorbar()
+    cbar.set_label("Vel m/s", rotation=360)
+    
     ax.set_xlabel('Longitudinal Position X/m')
     ax.set_ylabel("Lateral Position Y/m")
     ax.set_title('Planned Trajectory')
 
-    def update_annot(ind):
+    def update_annotation(ind):
         index = ind["ind"][0]
         pos = sc.get_offsets()[index]
         annotation.xy = pos
-        text = "{}. {:.3f}s".format(index + 1, time[index])
+        text = "{}. \n{:.3f}s".format(index + 1, time[index])
         annotation.set_text(text)
         annotation.get_bbox_patch().set_facecolor("cyan")
         annotation.get_bbox_patch().set_alpha(0.4)
@@ -217,7 +184,7 @@ def plot_trajectory(trajectory):
         if event.inaxes == ax:
             cont, ind = sc.contains(event)
             if cont:
-                update_annot(ind)
+                update_annotation(ind)
                 annotation.set_visible(True)
                 fig.canvas.draw_idle()
             else:
@@ -225,37 +192,44 @@ def plot_trajectory(trajectory):
                     annotation.set_visible(False)
                     fig.canvas.draw_idle()
     
+    axcolor = 'lightgoldenrodyellow'
+
+    # Make a horizontal slider to control the frequency.
+    axheading = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor=axcolor)
+    heading_slider = Slider(
+        ax=axheading,
+        label='Heading rate increment',
+        valmin=0.0001,
+        valmax=0.001,
+        valinit= heading_rate_increments
+    )
+
+    # The function to be called anytime a slider's value changes
+    def update(val):
+        new_trajectory = create_curved_trajectory(
+            init_point=starting_point, length=length,
+            discretization_m=discretization_m,
+            speed_max=speed_max, speed_increments=speed_increments,
+            stopping_decel=stopping_decl, heading_rate=heading_rate,
+            heading_rate_max=heading_rate_max, 
+            heading_rate_increments=heading_slider.val)
+
+        xy = []
+        for i in range(0, len(new_trajectory.points)):
+            point = new_trajectory.points[i]
+            xy.append((point.x, point.y))
+       
+        sc.set_offsets(xy)
+        fig.canvas.draw_idle()
+    
+    heading_slider.on_changed(update)
+
     fig.canvas.mpl_connect("motion_notify_event", hover)
+    # adjust the main plot to make room for the sliders
+    plt.subplots_adjust(bottom=0.25)
     plt.show()
 
-
-# # Make a horizontal slider to control the frequency.
-# axfreq = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor=axcolor)
-# freq_slider = Slider(
-#     ax=axfreq,
-#     label='Frequency [Hz]',
-#     valmin=0.1,
-#     valmax=30,
-#     valinit=init_frequency,
-# )
-
-# # The function to be called anytime a slider's value changes
-# sfreq = Slider(
-#     ax_freq, "Freq", 0, 10*np.pi,
-#     valinit=2*np.pi, valstep=np.pi,
-#     initcolor='none'  # Remove the line marking the valinit position.
-# )
-
 def main(args=None):
-    starting_point = TrajectoryPoint(longitudinal_velocity_mps=3.0) 
-    length = 100.0
-    discretization_m = 1.0
-    speed_max = 35.0
-    speed_increments = 0.33
-    stopping_decl = 3.0
-    heading_rate = 0.0
-    heading_rate_max = 1.0
-    heading_rate_increments = 0.0001
     curved_trajectory= create_curved_trajectory(init_point=starting_point, length=length, 
                                                 discretization_m=discretization_m,
                                                 speed_max=speed_max, speed_increments=speed_increments, 
