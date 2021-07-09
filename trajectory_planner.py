@@ -21,9 +21,9 @@ class Trajectory:
         return ret
 
 class TrajectoryPoint:
-    def __init__(self, x=0.0, y=0.0, heading_rad=0.0, 
-                 longitudinal_velocity_mps=0.0, acceleration_mps2=0.0, front_wheel_angle_rad=0.0):
-        self.time_from_start = 0.0 # seconds
+    def __init__(self, time_from_start=0.0, x=0.0, y=0.0, heading_rad=0.0, 
+                 longitudinal_velocity_mps=0.0, acceleration_mps2=0.0):
+        self.time_from_start = time_from_start # seconds
         self.x = x
         self.y = y
         self.heading_rad = heading_rad
@@ -36,8 +36,10 @@ class TrajectoryPoint:
 
     def __str__(self):
         return "{:.3f}s ({:.3f}, {:.3f}), heading = {:.6f}, velocity = {:.2f}".format(
-            self.time_from_start, self.x, self.y, self.heading_rad, self.longitudinal_velocity_mps)
+            self.time_from_start, self.x, self.y, self.heading_rad, 
+            self.longitudinal_velocity_mps)
 
+# common params for trajectory generation
 starting_point = TrajectoryPoint(longitudinal_velocity_mps=3.0) 
 length = 100.0
 discretization_m = 1.0
@@ -131,6 +133,7 @@ def create_curved_trajectory(
 
 fig, ax = plt.subplots()
 
+# annotation template to display index, time and velocity of waypoints 
 def create_annotation():
     annotation = ax.annotate("", 
         xy=(0,0), xytext=(-10, 30),
@@ -147,6 +150,7 @@ def plot_trajectory(trajectory):
     y = []
     vel = []
     time = []
+    heading = []
     
     for i in range(0, len(trajectory.points)):
         point = trajectory.points[i]
@@ -154,14 +158,27 @@ def plot_trajectory(trajectory):
         y.append(point.y)
         vel.append(point.longitudinal_velocity_mps)
         time.append(point.time_from_start)
+        heading.append(point.heading_rad)
     
     x = np.array(x)
     y = np.array(y)
     vel = np.array(vel)
     time = np.array(time)
+    heading = np.array(heading)
 
-    ax.set_ylim(-60,60)
+    ax.set_ylim(-60, 60)
+    ax.set_xlim(-10, 120)
     fig.set_size_inches(14, 9)
+
+    # to simulate the vehicle and display the headings of the waypoints
+    def apply_waypoint_heading(idx):
+        vehicle_length = 6
+        endx = x[idx] + vehicle_length * math.cos(math.degrees(heading[idx]))
+        endy = y[idx] + vehicle_length * math.sin(math.degrees(heading[idx]))
+        return (endx, endy)
+
+    init_endx, init_endy = apply_waypoint_heading(0)
+    line = ax.plot([x[0], init_endx], [y[0], init_endy])[0]
     sc = plt.scatter(x=x, y=y, c=vel, cmap="copper_r", vmin=0, vmax=50)
     cbar = plt.colorbar()
     cbar.set_label("Vel m/s", rotation=360)
@@ -169,17 +186,17 @@ def plot_trajectory(trajectory):
     ax.set_xlabel('Longitudinal Position X/m')
     ax.set_ylabel("Lateral Position Y/m")
     ax.set_title('Planned Trajectory')
-
-    def update_annotation(ind):
-        index = ind["ind"][0]
-        pos = sc.get_offsets()[index]
-        annotation.xy = pos
-        text = "{}. \n{:.3f}s".format(index + 1, time[index])
-        annotation.set_text(text)
-        annotation.get_bbox_patch().set_facecolor("cyan")
-        annotation.get_bbox_patch().set_alpha(0.4)
     
     def hover(event):
+        def update_annotation(ind):
+            index = ind["ind"][0]
+            pos = sc.get_offsets()[index]
+            annotation.xy = pos
+            text = "{}. \n{:.3f}s \n{:.2f}m/s".format(index, time[index], vel[index])
+            annotation.set_text(text)
+            annotation.get_bbox_patch().set_facecolor("cyan")
+            annotation.get_bbox_patch().set_alpha(0.4)
+        
         is_visible = annotation.get_visible()
         if event.inaxes == ax:
             cont, ind = sc.contains(event)
@@ -194,18 +211,37 @@ def plot_trajectory(trajectory):
     
     axcolor = 'lightgoldenrodyellow'
 
-    # Make a horizontal slider to control the frequency.
-    axheading = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor=axcolor)
+    # Make a vertical slider to control the heading rate increments.
+    axheading = plt.axes([0.1, 0.25, 0.0225, 0.63], facecolor=axcolor)
     heading_slider = Slider(
         ax=axheading,
         label='Heading rate increment',
         valmin=0.0001,
         valmax=0.001,
-        valinit= heading_rate_increments
+        valinit= heading_rate_increments,
+        valfmt = '%0.5f',
+        orientation= "vertical"
     )
 
-    # The function to be called anytime a slider's value changes
-    def update(val):
+    # Make a horizontal slider to control the index of waypoints.
+    axwaypoints = plt.axes([0.15, 0.1, 0.65, 0.03], facecolor=axcolor)
+    index_slider = Slider(
+        ax=axwaypoints,
+        label='Index',
+        valmin=0,
+        valmax=len(trajectory.points) - 1,
+        valinit= 0,
+        valfmt = '%0.0f',
+        orientation= "horizontal")
+
+    def update_index_plot(val):
+        idx = round(index_slider.val) # TODO: Update length of slider when new trajectory has different # points?
+        endx, endy = apply_waypoint_heading(idx)
+        line.set_xdata([x[idx], endx])
+        line.set_ydata([y[idx], endy])
+    
+    # function to be called when the trajectory params' sliders move
+    def update_trajectory_plot(val):
         new_trajectory = create_curved_trajectory(
             init_point=starting_point, length=length,
             discretization_m=discretization_m,
@@ -217,16 +253,30 @@ def plot_trajectory(trajectory):
         xy = []
         for i in range(0, len(new_trajectory.points)):
             point = new_trajectory.points[i]
+            
+            # mutate the arrays when the trajectory was initially plotted
+            x[i] = point.x
+            y[i] = point.y
+            vel[i] = point.longitudinal_velocity_mps
+            time[i] = point.time_from_start
+            heading[i] = point.heading_rad
+            
             xy.append((point.x, point.y))
-       
+        
+        # if len(new_trajectory.points) < len(trajectory):
+            # TODO: left over points from the original trajectory not overwritten 
+            
+        # when the trajectory changes, the index plot will always change too
+        update_index_plot(index_slider.val)
         sc.set_offsets(xy)
         fig.canvas.draw_idle()
     
-    heading_slider.on_changed(update)
+    heading_slider.on_changed(update_trajectory_plot)
+    index_slider.on_changed(update_index_plot)
 
     fig.canvas.mpl_connect("motion_notify_event", hover)
     # adjust the main plot to make room for the sliders
-    plt.subplots_adjust(bottom=0.25)
+    plt.subplots_adjust(left=0.25, bottom=0.25)
     plt.show()
 
 def main(args=None):
