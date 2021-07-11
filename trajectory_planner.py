@@ -192,7 +192,8 @@ def plot_trajectory(trajectory):
             index = ind["ind"][0]
             pos = sc.get_offsets()[index]
             annotation.xy = pos
-            text = "{}. \n{:.3f}s \n{:.2f}m/s".format(index, time[index], vel[index])
+            text = "{}. \nTimestamp: {:.3f}s \nVelocity: {:.2f}m/s\
+                \nHeading: {:.3f}\N{DEGREE SIGN}".format(index, time[index], vel[index], math.degrees(heading[index]))
             annotation.set_text(text)
             annotation.get_bbox_patch().set_facecolor("cyan")
             annotation.get_bbox_patch().set_alpha(0.4)
@@ -212,10 +213,10 @@ def plot_trajectory(trajectory):
     axcolor = 'lightgoldenrodyellow'
 
     # Make a vertical slider to control the heading rate increments.
-    axheading = plt.axes([0.1, 0.25, 0.0225, 0.63], facecolor=axcolor)
+    axheading = plt.axes([0.16, 0.25, 0.0225, 0.63], facecolor=axcolor)
     heading_slider = Slider(
         ax=axheading,
-        label='Heading rate increment',
+        label='Heading Increments\n(rad/s)',
         valmin=0.0001,
         valmax=0.001,
         valinit= heading_rate_increments,
@@ -223,19 +224,32 @@ def plot_trajectory(trajectory):
         orientation= "vertical"
     )
 
+    # Make a vertical slider to control the speed increments.
+    axspeed = plt.axes([0.06, 0.25, 0.0225, 0.63], facecolor=axcolor)
+    speed_slider = Slider(
+        ax=axspeed,
+        label='Speed Increments\n(m/s)',
+        valmin=0.33,
+        valmax=1.0,
+        valinit= speed_increments,
+        valfmt = '%0.3f',
+        orientation= "vertical"
+    )
+
     # Make a horizontal slider to control the index of waypoints.
-    axwaypoints = plt.axes([0.15, 0.1, 0.65, 0.03], facecolor=axcolor)
+    axwaypoints = plt.axes([0.25, 0.1, 0.63, 0.03], facecolor=axcolor)
+    # TODO: Update length of slider when new trajectory has different # points
     index_slider = Slider(
         ax=axwaypoints,
         label='Index',
         valmin=0,
-        valmax=len(trajectory.points) - 1,
+        valmax=len(x) - 1,
         valinit= 0,
         valfmt = '%0.0f',
         orientation= "horizontal")
 
     def update_index_plot(val):
-        idx = round(index_slider.val) # TODO: Update length of slider when new trajectory has different # points?
+        idx = round(index_slider.val)
         endx, endy = apply_waypoint_heading(idx)
         line.set_xdata([x[idx], endx])
         line.set_ydata([y[idx], endy])
@@ -245,11 +259,11 @@ def plot_trajectory(trajectory):
         new_trajectory = create_curved_trajectory(
             init_point=starting_point, length=length,
             discretization_m=discretization_m,
-            speed_max=speed_max, speed_increments=speed_increments,
+            speed_max=speed_max, speed_increments=speed_slider.val,
             stopping_decel=stopping_decl, heading_rate=heading_rate,
             heading_rate_max=heading_rate_max, 
             heading_rate_increments=heading_slider.val)
-
+        print(new_trajectory)
         xy = []
         for i in range(0, len(new_trajectory.points)):
             point = new_trajectory.points[i]
@@ -264,19 +278,22 @@ def plot_trajectory(trajectory):
             xy.append((point.x, point.y))
         
         # if len(new_trajectory.points) < len(trajectory):
+        #     x = x[::len(new_trajectory)]
             # TODO: left over points from the original trajectory not overwritten 
             
         # when the trajectory changes, the index plot will always change too
         update_index_plot(index_slider.val)
         sc.set_offsets(xy)
+        sc.set_cmap("copper_r")
         fig.canvas.draw_idle()
     
+    speed_slider.on_changed(update_trajectory_plot)
     heading_slider.on_changed(update_trajectory_plot)
     index_slider.on_changed(update_index_plot)
 
     fig.canvas.mpl_connect("motion_notify_event", hover)
     # adjust the main plot to make room for the sliders
-    plt.subplots_adjust(left=0.25, bottom=0.25)
+    plt.subplots_adjust(left=0.25, bottom=0.25, right=1.04)
     plt.show()
 
 def main(args=None):
