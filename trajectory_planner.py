@@ -142,15 +142,16 @@ def create_annotation():
         arrowprops=dict(arrowstyle="->"))
     annotation.set_visible(False)
     return annotation
-
 annotation = create_annotation()
 
+x = []
+y = []
+vel = []
+time = []
+heading = []
+
 def plot_trajectory(trajectory):
-    x = []
-    y = []
-    vel = []
-    time = []
-    heading = []
+    global x, y, vel, time, heading
     
     for i in range(0, len(trajectory.points)):
         point = trajectory.points[i]
@@ -238,7 +239,6 @@ def plot_trajectory(trajectory):
 
     # Make a horizontal slider to control the index of waypoints.
     axwaypoints = plt.axes([0.25, 0.1, 0.63, 0.03], facecolor=axcolor)
-    # TODO: Update length of slider when new trajectory has different # points
     index_slider = Slider(
         ax=axwaypoints,
         label='Index',
@@ -248,6 +248,7 @@ def plot_trajectory(trajectory):
         valfmt = '%0.0f',
         orientation= "horizontal")
 
+    # function to be called when the index slider moves
     def update_index_plot(val):
         idx = round(index_slider.val)
         endx, endy = apply_waypoint_heading(idx)
@@ -256,16 +257,14 @@ def plot_trajectory(trajectory):
     
     # function to be called when the trajectory params' sliders move
     def update_trajectory_plot(val):
-        new_trajectory = create_curved_trajectory(
-            init_point=starting_point, length=length,
-            discretization_m=discretization_m,
-            speed_max=speed_max, speed_increments=speed_slider.val,
-            stopping_decel=stopping_decl, heading_rate=heading_rate,
-            heading_rate_max=heading_rate_max, 
-            heading_rate_increments=heading_slider.val)
-        print(new_trajectory)
+        global speed_increments, heading_rate_increments, x, y, vel, time, heading
+        speed_increments = speed_slider.val
+        heading_rate_increments = heading_slider.val
+
+        new_trajectory = get_trajectory()
+        new_trajectory_len = len(new_trajectory.points)
         xy = []
-        for i in range(0, len(new_trajectory.points)):
+        for i in range(0, new_trajectory_len):
             point = new_trajectory.points[i]
             
             # mutate the arrays when the trajectory was initially plotted
@@ -277,10 +276,17 @@ def plot_trajectory(trajectory):
             
             xy.append((point.x, point.y))
         
-        # if len(new_trajectory.points) < len(trajectory):
-        #     x = x[::len(new_trajectory)]
-            # TODO: left over points from the original trajectory not overwritten 
-            
+        # some points from the original trajectory will not be overwritten
+        if new_trajectory_len < len(trajectory.points):
+            x = x[:new_trajectory_len]
+            y = y[:new_trajectory_len]
+            vel = y[:new_trajectory_len]
+            time = y[:new_trajectory_len]
+            heading = y[:new_trajectory_len]
+
+        # Update length of slider when new trajectory has different # points
+        index_slider.set_valmax = len(x) - 1
+
         # when the trajectory changes, the index plot will always change too
         update_index_plot(index_slider.val)
         sc.set_offsets(xy)
@@ -296,16 +302,15 @@ def plot_trajectory(trajectory):
     plt.subplots_adjust(left=0.25, bottom=0.25, right=1.04)
     plt.show()
 
+def get_trajectory():
+    return create_curved_trajectory(init_point=starting_point, length=length, 
+        discretization_m=discretization_m, speed_max=speed_max, speed_increments=speed_increments, 
+        stopping_decel=stopping_decl, heading_rate=heading_rate, 
+        heading_rate_max=heading_rate_max, heading_rate_increments=heading_rate_increments)
+
 def main(args=None):
-    curved_trajectory= create_curved_trajectory(init_point=starting_point, length=length, 
-                                                discretization_m=discretization_m,
-                                                speed_max=speed_max, speed_increments=speed_increments, 
-                                                stopping_decel=stopping_decl, heading_rate=heading_rate, 
-                                                heading_rate_max=heading_rate_max, 
-                                                heading_rate_increments=heading_rate_increments)
-    
-    # print(curved_trajectory)
-    plot_trajectory(curved_trajectory)
+    # print(trajectory)
+    plot_trajectory(get_trajectory())
 
 if __name__ == '__main__':
     main()
