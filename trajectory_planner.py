@@ -39,23 +39,34 @@ class TrajectoryPoint:
             self.time_from_start, self.x, self.y, self.heading_rad, 
             self.longitudinal_velocity_mps)
 
-# common params for trajectory generation
-starting_point = TrajectoryPoint(longitudinal_velocity_mps=3.0) 
-length = 100.0
-discretization_m = 1.0
-speed_max = 35.0
-speed_increments = 0.33
-stopping_decl = 3.0
-heading_rate = 0.0
-heading_rate_max = 1.0
-heading_rate_increments = 0.0001
+# common params for trajectory slider generation
+speed_increments = None
+speed_increments_valmin = None
+speed_increments_valmax = None
+heading_rate_increments = None
+heading_rate_increments_valmin = None
+heading_rate_increments_valmax = None
 
-def create_curved_trajectory(
-        init_point, 
-        length, discretization_m,
-        speed_max, speed_increments, stopping_decel,
-        heading_rate, heading_rate_max, heading_rate_increments
-    ):
+def create_curved_trajectory():
+        init_point = TrajectoryPoint(longitudinal_velocity_mps=3.0)
+        length = 100.0
+        discretization_m = 1.0
+        speed_max = 35.0
+        stopping_decel = 3.0
+        heading_rate = 0.0
+        heading_rate_max = 1.0
+
+        global heading_rate_increments, heading_rate_increments_valmin, heading_rate_increments_valmax
+        if heading_rate_increments_valmin == None:
+            heading_rate_increments = 0.0001 # slider
+            heading_rate_increments_valmin = 0.0001
+            heading_rate_increments_valmax = 0.001
+        global speed_increments, speed_increments_valmin, speed_increments_valmax
+        if speed_increments == None:
+            speed_increments = 0.33 # slider
+            speed_increments_valmin = 0.33
+            speed_increments_valmax = 1.0
+        
         trajectory_msg = Trajectory()
         
         num_points_max = Trajectory.capacity
@@ -218,8 +229,8 @@ def plot_trajectory(trajectory):
     heading_slider = Slider(
         ax=axheading,
         label='Heading Increments\n(rad/s)',
-        valmin=0.0001,
-        valmax=0.001,
+        valmin=heading_rate_increments_valmin,
+        valmax=heading_rate_increments_valmax,
         valinit= heading_rate_increments,
         valfmt = '%0.5f',
         orientation= "vertical"
@@ -230,8 +241,8 @@ def plot_trajectory(trajectory):
     speed_slider = Slider(
         ax=axspeed,
         label='Speed Increments\n(m/s)',
-        valmin=0.33,
-        valmax=1.0,
+        valmin=speed_increments_valmin,
+        valmax=speed_increments_valmax,
         valinit= speed_increments,
         valfmt = '%0.3f',
         orientation= "vertical"
@@ -303,10 +314,7 @@ def plot_trajectory(trajectory):
     plt.show()
 
 def get_trajectory():
-    return create_curved_trajectory(init_point=starting_point, length=length, 
-        discretization_m=discretization_m, speed_max=speed_max, speed_increments=speed_increments, 
-        stopping_decel=stopping_decl, heading_rate=heading_rate, 
-        heading_rate_max=heading_rate_max, heading_rate_increments=heading_rate_increments)
+    return create_curved_trajectory()
 
 def main(args=None):
     # print(trajectory)
