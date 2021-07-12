@@ -40,7 +40,7 @@ class TrajectoryPoint:
             self.time_from_start, self.x, self.y, self.heading_rad, 
             self.longitudinal_velocity_mps)
 
-# common params for trajectory slider generation
+# params for sliders generation
 initial_speed = None
 initial_speed_valmin = None
 initial_speed_valmax = None
@@ -77,7 +77,7 @@ def create_lane_change_trajectory():
         initial_speed_valmax = 10.0
     global final_speed, final_speed_valmin, final_speed_valmax
     if final_speed == None:
-        final_speed = 0.0
+        final_speed = 3.0 # slider
         final_speed_valmin = 0.0
         final_speed_valmax = 10.0
 
@@ -91,7 +91,7 @@ def create_lane_change_trajectory():
             % float(length / num_points_max)
         )
     discretization_distance_m = float(length / num_points)
-    
+
     # start at base_link
     first_point = TrajectoryPoint(longitudinal_velocity_mps=initial_speed)
     trajectory_msg.points.append(first_point)
@@ -113,8 +113,9 @@ def create_lane_change_trajectory():
             speed += speed_increments
             
             next_speed = speed + speed_increments
-            predicted_stopping_time = next_speed / stopping_decel
-            predicted_stopping_distance = next_speed * predicted_stopping_time - 0.5 * stopping_decel * predicted_stopping_time * predicted_stopping_time
+            predicted_stopping_time = (next_speed - final_speed) / stopping_decel
+            predicted_stopping_distance = next_speed * predicted_stopping_time \
+                - 0.5 * stopping_decel * predicted_stopping_time * predicted_stopping_time
             if ((num_points - i) * discretization_distance_m) <= predicted_stopping_distance:
                 decelerating = True
 
@@ -125,7 +126,7 @@ def create_lane_change_trajectory():
             seconds += seconds_delta
             if decelerating:
                 speed -= stopping_decel * seconds_delta
-                speed = max(0.0, speed)
+                speed = max(final_speed, speed)
 
         # update heading
         if i >= round(num_points * 0.2) and i < round(num_points * 0.6):
@@ -145,7 +146,6 @@ def create_lane_change_trajectory():
 
         cur_x += discretization_m * np.cos(heading_angle)
         cur_y += discretization_m * np.sin(heading_angle)
-
         trajectory_point.x = cur_x
         trajectory_point.y = cur_y
         
@@ -349,7 +349,7 @@ def plot_trajectory(trajectory):
         orientation= "vertical"
     )
 
-    # Make a vertical slider to control the initial speed.
+    # Make a vertical slider to control the final speed.
     axfinalspeed = plt.axes([0.085, 0.25, 0.0225, 0.63], facecolor=axcolor)
     final_speed_slider = Slider(
         ax=axfinalspeed,
@@ -393,8 +393,9 @@ def plot_trajectory(trajectory):
     
     # function to be called when the trajectory params' sliders move
     def update_trajectory_plot(val):
-        global initial_speed, heading_rate_increments, x, y, vel, time, heading
+        global initial_speed, final_speed, heading_rate_increments, x, y, vel, time, heading
         initial_speed = initial_speed_slider.val
+        final_speed = final_speed_slider.val
         heading_rate_increments = heading_slider.val
 
         new_trajectory = get_trajectory()
