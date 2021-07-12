@@ -48,6 +48,8 @@ heading_rate_increments_valmin = None
 heading_rate_increments_valmax = None
 
 def create_lane_change_trajectory():
+        ax.set_ylim(-20, 20)
+        ax.set_xlim(-10, 120)
         init_point = TrajectoryPoint(longitudinal_velocity_mps=3.0)
         length = 100.0
         discretization_m = 1.0
@@ -102,11 +104,6 @@ def create_lane_change_trajectory():
             if speed > 0:
                 seconds_delta = float(discretization_distance_m / speed)
                 seconds += seconds_delta
-
-            # update heading
-            heading_angle += heading_rate
-            heading_rate += heading_rate_increments
-            heading_rate = max(-heading_rate_max, min(heading_rate_max, heading_rate))
 
             # fillup trajectory point
             trajectory_point = TrajectoryPoint()
@@ -267,6 +264,8 @@ def create_lane_change_trajectory():
         return trajectory_msg     
 
 def create_curved_trajectory():
+        ax.set_ylim(-60, 60)
+        ax.set_xlim(-10, 120)
         init_point = TrajectoryPoint(longitudinal_velocity_mps=3.0)
         length = 100.0
         discretization_m = 1.0
@@ -397,8 +396,8 @@ def plot_trajectory(trajectory):
     time = np.array(time)
     heading = np.array(heading)
 
-    ax.set_ylim(-60, 60)
-    ax.set_xlim(-10, 120)
+    # ax.set_ylim(-60, 60)
+    # ax.set_xlim(-10, 120)
     fig.set_size_inches(14, 9)
 
     # to simulate the vehicle and display the headings of the waypoints
