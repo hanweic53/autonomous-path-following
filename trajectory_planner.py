@@ -1,3 +1,4 @@
+from tkinter.constants import N
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button
 import numpy as np
@@ -43,6 +44,9 @@ class TrajectoryPoint:
 initial_speed = None
 initial_speed_valmin = None
 initial_speed_valmax = None
+final_speed = None
+final_speed_valmin = None
+final_speed_valmax = None
 heading_rate_increments = None
 heading_rate_increments_valmin = None
 heading_rate_increments_valmax = None
@@ -71,7 +75,12 @@ def create_lane_change_trajectory():
         initial_speed = 3.0 # slider
         initial_speed_valmin = 0.0
         initial_speed_valmax = 10.0
-    
+    global final_speed, final_speed_valmin, final_speed_valmax
+    if final_speed == None:
+        final_speed = 0.0
+        final_speed_valmin = 0.0
+        final_speed_valmax = 10.0
+
     trajectory_msg = Trajectory()
     
     num_points_max = Trajectory.capacity
@@ -83,12 +92,11 @@ def create_lane_change_trajectory():
         )
     discretization_distance_m = float(length / num_points)
     
-
     # start at base_link
     first_point = TrajectoryPoint(longitudinal_velocity_mps=initial_speed)
     trajectory_msg.points.append(first_point)
 
-    stopping = False
+    decelerating = False
     speed = first_point.longitudinal_velocity_mps
     seconds = 0.0
     if speed > 0:
@@ -99,111 +107,37 @@ def create_lane_change_trajectory():
     prev_heading_angle = heading_angle
     prev_speed = speed
 
-    for i in range(1, round(num_points * 0.2)):
+    for i in range(2, num_points + 1):
         # update speed profile
-        speed += speed_increments
-        speed = min(speed, speed_max)
-
-
-        if speed > 0:
-            seconds_delta = float(discretization_distance_m / speed)
-            seconds += seconds_delta
-
-        # fillup trajectory point
-        trajectory_point = TrajectoryPoint()
-        trajectory_point.time_from_start = seconds
-
-        cur_x += discretization_m * np.cos(heading_angle)
-        cur_y += discretization_m * np.sin(heading_angle)
-
-        trajectory_point.x = cur_x
-        trajectory_point.y = cur_y
-        
-        trajectory_point.heading_rad = math.radians(heading_angle)
-        trajectory_point.longitudinal_velocity_mps = float(speed)
-        trajectory_point.acceleration_mps2 = (speed - prev_speed) / seconds
-        trajectory_point.heading_rate_rps = (heading_angle - prev_heading_angle) / seconds
-
-        trajectory_msg.points.append(trajectory_point)
-        prev_heading_angle = heading_angle
-        prev_speed = speed
-
-    for i in range(round(num_points * 0.2), round(num_points * 0.6)):
-        # update speed profile
-        if not stopping:
+        if not decelerating:
             speed += speed_increments
-            stopping_time = speed / stopping_decel
-            stopping_distance = \
-                speed * stopping_time \
-                - 0.5 * stopping_decel * stopping_time * stopping_time
-            if ((num_points - i) * discretization_distance_m) <= stopping_distance:
-                stopping = True
+            
+            next_speed = speed + speed_increments
+            predicted_stopping_time = next_speed / stopping_decel
+            predicted_stopping_distance = next_speed * predicted_stopping_time - 0.5 * stopping_decel * predicted_stopping_time * predicted_stopping_time
+            if ((num_points - i) * discretization_distance_m) <= predicted_stopping_distance:
+                decelerating = True
 
         speed = min(speed, speed_max)
-
-        if i == (num_points - 2):
-            speed = 0.0
 
         if speed > 0:
             seconds_delta = float(discretization_distance_m / speed)
             seconds += seconds_delta
-            if stopping:
+            if decelerating:
                 speed -= stopping_decel * seconds_delta
                 speed = max(0.0, speed)
 
         # update heading
-        heading_angle -= heading_rate
-        heading_rate += heading_rate_increments
-        heading_rate = max(-heading_rate_max, min(heading_rate_max, heading_rate))
-
-        # fillup trajectory point
-        trajectory_point = TrajectoryPoint()
-        trajectory_point.time_from_start = seconds
-
-        cur_x += discretization_m * np.cos(heading_angle)
-        cur_y += discretization_m * np.sin(heading_angle)
-
-        trajectory_point.x = cur_x
-        trajectory_point.y = cur_y
-        
-        trajectory_point.heading_rad = math.radians(heading_angle)
-        trajectory_point.longitudinal_velocity_mps = float(speed)
-        trajectory_point.acceleration_mps2 = (speed - prev_speed) / seconds
-        trajectory_point.heading_rate_rps = (heading_angle - prev_heading_angle) / seconds
-
-        trajectory_msg.points.append(trajectory_point)
-        prev_heading_angle = heading_angle
-        prev_speed = speed
-    
-    for i in range(round(num_points * 0.6), round(num_points * 0.8)):
-        # update speed profile
-        if not stopping:
-            speed += speed_increments
-            stopping_time = speed / stopping_decel
-            stopping_distance = \
-                speed * stopping_time \
-                - 0.5 * stopping_decel * stopping_time * stopping_time
-            if ((num_points - i) * discretization_distance_m) <= stopping_distance:
-                stopping = True
-
-        speed = min(speed, speed_max)
-
-        if i == (num_points - 2):
-            speed = 0.0
-
-        if speed > 0:
-            seconds_delta = float(discretization_distance_m / speed)
-            seconds += seconds_delta
-            if stopping:
-                speed -= stopping_decel * seconds_delta
-                speed = max(0.0, speed)
-
-        # update heading
-        heading_angle += heading_rate
-        heading_rate += heading_rate_increments
-        if (heading_angle > 0):
-            heading_angle = 0
-        heading_rate = max(-heading_rate_max, min(heading_rate_max, heading_rate))
+        if i >= round(num_points * 0.2) and i < round(num_points * 0.6):
+            heading_angle -= heading_rate
+            heading_rate += heading_rate_increments
+            heading_rate = max(-heading_rate_max, min(heading_rate_max, heading_rate))
+        elif i >= round(num_points * 0.6) and i < round(num_points * 0.8):
+            heading_angle += heading_rate
+            heading_rate += heading_rate_increments
+            heading_rate = max(-heading_rate_max, min(heading_rate_max, heading_rate))
+            if heading_angle >= 0:
+                heading_angle = 0
 
         # fillup trajectory point
         trajectory_point = TrajectoryPoint()
@@ -224,47 +158,6 @@ def create_lane_change_trajectory():
         prev_heading_angle = heading_angle
         prev_speed = speed
 
-    for i in range(round(num_points * 0.8), num_points):
-        # update speed profile
-        if not stopping:
-            speed += speed_increments
-            stopping_time = speed / stopping_decel
-            stopping_distance = \
-                speed * stopping_time \
-                - 0.5 * stopping_decel * stopping_time * stopping_time
-            if ((num_points - i) * discretization_distance_m) <= stopping_distance:
-                stopping = True
-
-        speed = min(speed, speed_max)
-
-        if i == (num_points - 2):
-            speed = 0.0
-
-        if speed > 0:
-            seconds_delta = float(discretization_distance_m / speed)
-            seconds += seconds_delta
-            if stopping:
-                speed -= stopping_decel * seconds_delta
-                speed = max(0.0, speed)
-
-        # fillup trajectory point
-        trajectory_point = TrajectoryPoint()
-        trajectory_point.time_from_start = seconds
-
-        cur_x += discretization_m * np.cos(heading_angle)
-        cur_y += discretization_m * np.sin(heading_angle)
-
-        trajectory_point.x = cur_x
-        trajectory_point.y = cur_y
-        
-        trajectory_point.heading_rad = math.radians(heading_angle)
-        trajectory_point.longitudinal_velocity_mps = float(speed)
-        trajectory_point.acceleration_mps2 = (speed - prev_speed) / seconds
-        trajectory_point.heading_rate_rps = (heading_angle - prev_heading_angle) / seconds
-
-        trajectory_msg.points.append(trajectory_point)
-        prev_heading_angle = heading_angle
-        prev_speed = speed
     return trajectory_msg     
 
 def create_curved_trajectory():
@@ -457,13 +350,13 @@ def plot_trajectory(trajectory):
     )
 
     # Make a vertical slider to control the initial speed.
-    axendingspeed = plt.axes([0.085, 0.25, 0.0225, 0.63], facecolor=axcolor)
-    ending_speed_slider = Slider(
-        ax=axendingspeed,
+    axfinalspeed = plt.axes([0.085, 0.25, 0.0225, 0.63], facecolor=axcolor)
+    final_speed_slider = Slider(
+        ax=axfinalspeed,
         label='Final speed\n(m/s)',
-        valmin=initial_speed_valmin,
-        valmax=initial_speed_valmax,
-        valinit=initial_speed,
+        valmin=final_speed_valmin,
+        valmax=final_speed_valmax,
+        valinit=final_speed,
         valfmt = '%0.3f',
         orientation= "vertical"
     )
@@ -537,7 +430,7 @@ def plot_trajectory(trajectory):
         fig.canvas.draw_idle()
     
     initial_speed_slider.on_changed(update_trajectory_plot)
-    ending_speed_slider.on_changed(update_trajectory_plot)
+    final_speed_slider.on_changed(update_trajectory_plot)
     heading_slider.on_changed(update_trajectory_plot)
     index_slider.on_changed(update_index_plot)
 
@@ -551,7 +444,7 @@ def get_trajectory():
     return create_lane_change_trajectory()
 
 def main(args=None):
-    # print(trajectory)
+    # print(get_trajectory())
     plot_trajectory(get_trajectory())
 
 if __name__ == '__main__':
