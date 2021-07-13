@@ -170,7 +170,7 @@ def create_lane_change_trajectory():
 
 def create_junction_turning_trajectory():
     # set params for plot
-    ax.set_ylim(-60, 5)
+    ax.set_ylim(-70, 5)
     ax.set_xlim(-10, 120)
 
     # set params for trajectory    
@@ -184,9 +184,9 @@ def create_junction_turning_trajectory():
 
     global heading_rate_increments, heading_rate_increments_valmin, heading_rate_increments_valmax
     if heading_rate_increments_valmin == None:
-        heading_rate_increments = 0.0002 # slider
-        heading_rate_increments_valmin = 0.0001
-        heading_rate_increments_valmax = 0.002
+        heading_rate_increments = 0.003 # slider
+        heading_rate_increments_valmin = 0.001
+        heading_rate_increments_valmax = 0.005
     global initial_speed, initial_speed_valmin, initial_speed_valmax
     if initial_speed == None:
         initial_speed = 3.0 # slider
@@ -499,6 +499,17 @@ def plot_trajectory(trajectory):
         valinit= 0,
         valfmt = '%0.0f',
         orientation= "horizontal")
+    
+    # Create a button to reset the sliders to initial values.
+    resetax = plt.axes([0.1, 0.15, 0.1, 0.04])
+    button = Button(resetax, 'Reset', color=axcolor, hovercolor='0.975')
+    def reset(event):
+        index_slider.reset()
+        initial_speed_slider.reset()
+        final_speed_slider.reset()
+        heading_slider.reset()
+
+    button.on_clicked(reset)
 
     # function to be called when the index slider moves
     def update_index_plot(val):
@@ -515,7 +526,7 @@ def plot_trajectory(trajectory):
         heading_rate_increments = heading_slider.val
 
         new_trajectory = get_trajectory()
-        print(new_trajectory)
+        # print(new_trajectory)
         new_trajectory_len = len(new_trajectory.points)
         xy = []
         for i in range(0, new_trajectory_len):
@@ -565,7 +576,7 @@ def get_trajectory():
     return create_junction_turning_trajectory()
 
 def main(args=None):
-    print(get_trajectory())
+    # print(get_trajectory())
     plot_trajectory(get_trajectory())
 
 if __name__ == '__main__':
