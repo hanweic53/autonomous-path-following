@@ -116,7 +116,7 @@ def create_lane_change_trajectory():
             predicted_stopping_time = (next_speed - final_speed) / stopping_decel
             predicted_stopping_distance = next_speed * predicted_stopping_time \
                 - 0.5 * stopping_decel * predicted_stopping_time * predicted_stopping_time
-            if ((num_points - i) * discretization_distance_m) <= predicted_stopping_distance:
+            if ((num_points - i - 1) * discretization_distance_m) <= predicted_stopping_distance:
                 decelerating = True
 
         speed = min(speed, speed_max)
@@ -445,7 +445,7 @@ def get_trajectory():
     return create_lane_change_trajectory()
 
 def main(args=None):
-    # print(get_trajectory())
+    print(get_trajectory())
     plot_trajectory(get_trajectory())
 
 if __name__ == '__main__':
