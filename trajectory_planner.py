@@ -4,6 +4,14 @@ from matplotlib.widgets import Slider, Button
 import numpy as np
 import math
 
+from numpy.lib.arraypad import pad
+
+def to_mps(kmph):
+    return (kmph * 1000)/3600
+
+def to_kmph(mps):
+    return (mps * 3600) / 1000
+
 class Trajectory:
     capacity = 100 # max. length in Trajectory.msg
 
@@ -59,7 +67,7 @@ def create_lane_change_trajectory():
     # set params for trajectory    
     length = 100.0
     discretization_m = 1.0
-    speed_increments = 0.33
+    speed_increments = 0.15
     speed_max = 35.0
     stopping_decel = 3.0
     heading_rate = 0.0
@@ -74,12 +82,12 @@ def create_lane_change_trajectory():
     if initial_speed == None:
         initial_speed = 3.0 # slider
         initial_speed_valmin = 0.0
-        initial_speed_valmax = 10.0
+        initial_speed_valmax = 20.0
     global final_speed, final_speed_valmin, final_speed_valmax
     if final_speed == None:
         final_speed = 3.0 # slider
         final_speed_valmin = 0.0
-        final_speed_valmax = 10.0
+        final_speed_valmax = 20.0
 
     trajectory_msg = Trajectory()
     
@@ -273,23 +281,26 @@ annotation = create_annotation()
 x = []
 y = []
 vel = []
+vel_kmph = []
 time = []
 heading = []
 
 def plot_trajectory(trajectory):
-    global x, y, vel, time, heading
+    global x, y, vel, vel_kmph, time, heading
     
     for i in range(0, len(trajectory.points)):
         point = trajectory.points[i]
         x.append(point.x)
         y.append(point.y)
         vel.append(point.longitudinal_velocity_mps)
+        vel_kmph.append(to_kmph(point.longitudinal_velocity_mps))
         time.append(point.time_from_start)
         heading.append(point.heading_rad)
     
     x = np.array(x)
     y = np.array(y)
     vel = np.array(vel)
+    vel_kmph = np.array(vel_kmph)
     time = np.array(time)
     heading = np.array(heading)
 
@@ -304,9 +315,9 @@ def plot_trajectory(trajectory):
 
     init_endx, init_endy = apply_waypoint_heading(0)
     line = ax.plot([x[0], init_endx], [y[0], init_endy])[0]
-    sc = plt.scatter(x=x, y=y, c=vel, cmap="copper_r", vmin=0, vmax=50)
-    cbar = plt.colorbar()
-    cbar.set_label("Vel m/s", rotation=360)
+    sc = plt.scatter(x=x, y=y, c=vel_kmph, cmap="copper_r", vmin=0, vmax=80)
+    cbar = plt.colorbar(pad=0.02)
+    cbar.set_label("Vel km/h", rotation=360, labelpad=30)
     
     ax.set_xlabel('Longitudinal Position X/m')
     ax.set_ylabel("Lateral Position Y/m")
@@ -317,8 +328,7 @@ def plot_trajectory(trajectory):
             index = ind["ind"][0]
             pos = sc.get_offsets()[index]
             annotation.xy = pos
-            text = "{}. \n({:.3f},{:.3f})\nTimestamp: {:.3f}s \nVelocity: {:.2f}m/s\
-                \nHeading: {:.3f}\N{DEGREE SIGN}".format(index, x[index], y[index], time[index], vel[index], math.degrees(heading[index]))
+            text = "{}. \n({:.3f},{:.3f})\nTimestamp: {:.3f}s \nVelocity: {:.2f}m/s {:.2f}km/h \nHeading: {:.3f}\N{DEGREE SIGN}".format(index, x[index], y[index], time[index], vel[index], to_kmph(vel[index]), math.degrees(heading[index]))
             annotation.set_text(text)
             annotation.get_bbox_patch().set_facecolor("cyan")
             annotation.get_bbox_patch().set_alpha(0.4)
@@ -341,10 +351,10 @@ def plot_trajectory(trajectory):
     axinitialspeed = plt.axes([0.02, 0.25, 0.0225, 0.63], facecolor=axcolor)
     initial_speed_slider = Slider(
         ax=axinitialspeed,
-        label='Starting speed\n(m/s)',
-        valmin=initial_speed_valmin,
-        valmax=initial_speed_valmax,
-        valinit=initial_speed,
+        label='Starting speed\n(km/h)',
+        valmin=to_kmph(initial_speed_valmin),
+        valmax=to_kmph(initial_speed_valmax),
+        valinit=to_kmph(initial_speed),
         valfmt = '%0.3f',
         orientation= "vertical"
     )
@@ -353,10 +363,10 @@ def plot_trajectory(trajectory):
     axfinalspeed = plt.axes([0.085, 0.25, 0.0225, 0.63], facecolor=axcolor)
     final_speed_slider = Slider(
         ax=axfinalspeed,
-        label='Final speed\n(m/s)',
-        valmin=final_speed_valmin,
-        valmax=final_speed_valmax,
-        valinit=final_speed,
+        label='Final speed\n(km/h)',
+        valmin=to_kmph(final_speed_valmin),
+        valmax=to_kmph(final_speed_valmax),
+        valinit=to_kmph(final_speed),
         valfmt = '%0.3f',
         orientation= "vertical"
     )
@@ -393,9 +403,9 @@ def plot_trajectory(trajectory):
     
     # function to be called when the trajectory params' sliders move
     def update_trajectory_plot(val):
-        global initial_speed, final_speed, heading_rate_increments, x, y, vel, time, heading
-        initial_speed = initial_speed_slider.val
-        final_speed = final_speed_slider.val
+        global initial_speed, final_speed, heading_rate_increments, x, y, vel, vel_kmph, time, heading
+        initial_speed = to_mps(initial_speed_slider.val)
+        final_speed = to_mps(final_speed_slider.val)
         heading_rate_increments = heading_slider.val
 
         new_trajectory = get_trajectory()
@@ -408,6 +418,7 @@ def plot_trajectory(trajectory):
             x[i] = point.x
             y[i] = point.y
             vel[i] = point.longitudinal_velocity_mps
+            vel_kmph[i] = to_kmph(point.longitudinal_velocity_mps)
             time[i] = point.time_from_start
             heading[i] = point.heading_rad
             
@@ -417,9 +428,10 @@ def plot_trajectory(trajectory):
         if new_trajectory_len < len(trajectory.points):
             x = x[:new_trajectory_len]
             y = y[:new_trajectory_len]
-            vel = y[:new_trajectory_len]
-            time = y[:new_trajectory_len]
-            heading = y[:new_trajectory_len]
+            vel = vel[:new_trajectory_len]
+            vel_kmph = vel_kmph[:new_trajectory_len]
+            time = time[:new_trajectory_len]
+            heading = heading[:new_trajectory_len]
 
         # Update length of slider when new trajectory has different # points
         index_slider.set_valmax = len(x) - 1
@@ -445,7 +457,7 @@ def get_trajectory():
     return create_lane_change_trajectory()
 
 def main(args=None):
-    print(get_trajectory())
+    # print(get_trajectory())
     plot_trajectory(get_trajectory())
 
 if __name__ == '__main__':
