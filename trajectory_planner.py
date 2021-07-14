@@ -582,13 +582,12 @@ def plot_trajectory(trajectory):
     plt.show()
 
 def get_trajectory():
-    # return create_curved_trajectory()
     return create_lane_change_trajectory()
     # return create_junction_turning_trajectory()
     # return create_highway_bend_trajectory()
 
 def main(args=None):
-    print(get_trajectory())
+    # print(get_trajectory())
     plot_trajectory(get_trajectory())
 
 if __name__ == '__main__':
