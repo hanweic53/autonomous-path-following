@@ -44,9 +44,9 @@ class TrajectoryPoint:
         # self.rear_wheel_angle_rad = 0.0
 
     def __str__(self):
-        return "{:.3f}s ({:.3f}, {:.3f}), heading = {:.6f}, velocity = {:.2f}".format(
+        return "{:.3f}s ({:.3f}, {:.3f}), heading = {:.6f}rad, velocity = {:.2f}m/s {:.2f}km/h".format(
             self.time_from_start, self.x, self.y, self.heading_rad, 
-            self.longitudinal_velocity_mps)
+            self.longitudinal_velocity_mps, to_kmph(self.longitudinal_velocity_mps))
 
 # params for sliders generation
 initial_speed = None
@@ -75,7 +75,7 @@ def create_lane_change_trajectory():
 
     global heading_rate_increments, heading_rate_increments_valmin, heading_rate_increments_valmax
     if heading_rate_increments_valmin == None:
-        heading_rate_increments = 0.00015 # slider
+        heading_rate_increments = 0.00018 # slider
         heading_rate_increments_valmin = 0.0001
         heading_rate_increments_valmax = 0.001
     global initial_speed, initial_speed_valmin, initial_speed_valmax
@@ -185,7 +185,7 @@ def create_junction_turning_trajectory():
 
     global heading_rate_increments, heading_rate_increments_valmin, heading_rate_increments_valmax
     if heading_rate_increments_valmin == None:
-        heading_rate_increments = 0.003 # slider
+        heading_rate_increments = 0.005 # slider
         heading_rate_increments_valmin = 0.001
         heading_rate_increments_valmax = 0.005
     global initial_speed, initial_speed_valmin, initial_speed_valmax
@@ -680,12 +680,12 @@ def plot_trajectory(trajectory):
 
 def get_trajectory():
     # return create_curved_trajectory()
-    # return create_lane_change_trajectory()
+    return create_lane_change_trajectory()
     # return create_junction_turning_trajectory()
-    return create_highway_bend_trajectory()
+    # return create_highway_bend_trajectory()
 
 def main(args=None):
-    # print(get_trajectory())
+    print(get_trajectory())
     plot_trajectory(get_trajectory())
 
 if __name__ == '__main__':
