@@ -1,10 +1,14 @@
 from tkinter.constants import N
-import matplotlib.pyplot as plt
-from matplotlib.widgets import Slider, Button
-import numpy as np
+
 import math
 
+import matplotlib.pyplot as plt
+from matplotlib.widgets import Slider, Button
+
+import numpy as np
 from numpy.lib.arraypad import pad
+
+import csv
 
 def to_mps(kmph):
     return (kmph * 1000)/3600
@@ -60,6 +64,11 @@ heading_rate_increments_valmin = None
 heading_rate_increments_valmax = None
 
 def create_lane_change_trajectory():
+    f = open('lane_change_trajectory.csv', 'w')
+    writer = csv.writer(f)
+    writer.writerow(['time_from_start', "x", 'y', "heading_rad", "longitudinal_velocity_mps",
+        'acceleration_mps2'])
+    # f.close()
     # set params for plot
     ax.set_ylim(-20, 20)
     ax.set_xlim(-10, 120)
@@ -103,6 +112,8 @@ def create_lane_change_trajectory():
     # start at base_link
     first_point = TrajectoryPoint(longitudinal_velocity_mps=initial_speed)
     trajectory_msg.points.append(first_point)
+    # write into csv
+    writer.writerow([first_point.time_from_start, first_point.x, first_point.y, first_point.heading_rad, first_point.longitudinal_velocity_mps, first_point.acceleration_mps2])
 
     decelerating = False
     speed = first_point.longitudinal_velocity_mps
@@ -163,9 +174,13 @@ def create_lane_change_trajectory():
         trajectory_point.heading_rate_rps = (heading_angle - prev_heading_angle) / seconds
 
         trajectory_msg.points.append(trajectory_point)
+        # write into csv
+        writer.writerow([trajectory_point.time_from_start, trajectory_point.x, trajectory_point.y, trajectory_point.heading_rad, trajectory_point.longitudinal_velocity_mps, trajectory_point.acceleration_mps2])
+
         prev_heading_angle = heading_angle
         prev_speed = speed
 
+    f.close()
     return trajectory_msg     
 
 # higher curvature, lower speed than highway bend
