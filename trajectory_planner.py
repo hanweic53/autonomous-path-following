@@ -66,9 +66,9 @@ heading_rate_increments_valmax = None
 def create_lane_change_trajectory():
     f = open('trajectories/lane_change_trajectory.csv', 'w')
     writer = csv.writer(f)
-    writer.writerow(['time_from_start', "x", 'y', "heading_rad", "longitudinal_velocity_mps",
+    writer.writerow(['time_from_start', "x", 'y', "heading_degrees", "longitudinal_velocity_mps",
         'acceleration_mps2'])
-    # f.close()
+    
     # set params for plot
     ax.set_ylim(-20, 20)
     ax.set_xlim(-10, 120)
@@ -175,7 +175,8 @@ def create_lane_change_trajectory():
 
         trajectory_msg.points.append(trajectory_point)
         # write into csv
-        writer.writerow([trajectory_point.time_from_start, trajectory_point.x, trajectory_point.y, trajectory_point.heading_rad, trajectory_point.longitudinal_velocity_mps, trajectory_point.acceleration_mps2])
+        # writing heading angle in degrees because Autoware's Heading requires conversion into Complex32 from degrees
+        writer.writerow([trajectory_point.time_from_start, trajectory_point.x, trajectory_point.y, heading_angle, trajectory_point.longitudinal_velocity_mps, trajectory_point.acceleration_mps2])
 
         prev_heading_angle = heading_angle
         prev_speed = speed
