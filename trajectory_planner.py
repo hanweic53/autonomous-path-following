@@ -64,7 +64,7 @@ heading_rate_increments_valmin = None
 heading_rate_increments_valmax = None
 
 def create_lane_change_trajectory():
-    f = open('lane_change_trajectory.csv', 'w')
+    f = open('trajectories/lane_change_trajectory.csv', 'w')
     writer = csv.writer(f)
     writer.writerow(['time_from_start', "x", 'y', "heading_rad", "longitudinal_velocity_mps",
         'acceleration_mps2'])
