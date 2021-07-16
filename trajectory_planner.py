@@ -184,6 +184,126 @@ def create_lane_change_trajectory():
     f.close()
     return trajectory_msg     
 
+def create_lane_change_trajectory_discretization_pointfive():
+    f = open('/home/han/adehome/AutowareAuto/src/control/ros_simulator/src/trajectories/lane_change_trajectory_discretization_pointfive.csv', 'w')
+    writer = csv.writer(f)
+    writer.writerow(['time_from_start', "x", 'y', "heading_degrees", "longitudinal_velocity_mps",
+        'acceleration_mps2'])
+    
+    # set params for plot
+    ax.set_ylim(-20, 20)
+    ax.set_xlim(-10, 120)
+
+    # set params for trajectory    
+    length = 50.0
+    discretization_m = 0.5
+    speed_increments = 0.15
+    speed_max = 35.0
+    stopping_decel = 1.0
+    heading_rate = 0.0
+    heading_rate_max = 1.0
+
+    global heading_rate_increments, heading_rate_increments_valmin, heading_rate_increments_valmax
+    if heading_rate_increments_valmin == None:
+        heading_rate_increments = 0.00018 # slider
+        heading_rate_increments_valmin = 0.0001
+        heading_rate_increments_valmax = 0.001
+    global initial_speed, initial_speed_valmin, initial_speed_valmax
+    if initial_speed == None:
+        initial_speed = 3.0 # slider
+        initial_speed_valmin = 0.0
+        initial_speed_valmax = 20.0
+    global final_speed, final_speed_valmin, final_speed_valmax
+    if final_speed == None:
+        final_speed = 3.0 # slider
+        final_speed_valmin = 0.0
+        final_speed_valmax = 20.0
+
+    trajectory_msg = Trajectory()
+    
+    num_points_max = Trajectory.capacity
+    num_points = int(length / discretization_m)  
+    if num_points > num_points_max:
+        num_points = num_points_max
+        print("Only 100 points available - discretization set to %s"
+            % float(length / num_points_max)
+        )
+    discretization_distance_m = float(length / num_points)
+
+    # start at base_link
+    first_point = TrajectoryPoint(longitudinal_velocity_mps=initial_speed)
+    trajectory_msg.points.append(first_point)
+    # write into csv
+    writer.writerow([first_point.time_from_start, first_point.x, first_point.y, first_point.heading_rad, first_point.longitudinal_velocity_mps, first_point.acceleration_mps2])
+
+    decelerating = False
+    speed = first_point.longitudinal_velocity_mps
+    seconds = 0.0
+    if speed > 0:
+        seconds = float(discretization_distance_m / speed)
+    cur_x = first_point.x
+    cur_y = first_point.y
+    heading_angle = math.degrees(first_point.heading_rad)
+    prev_heading_angle = heading_angle
+    prev_speed = speed
+
+    for i in range(2, num_points + 1):
+        # update speed profile
+        if not decelerating:
+            speed += speed_increments
+            
+            next_speed = speed + speed_increments
+            predicted_stopping_time = (next_speed - final_speed) / stopping_decel
+            predicted_stopping_distance = next_speed * predicted_stopping_time \
+                - 0.5 * stopping_decel * predicted_stopping_time * predicted_stopping_time
+            if ((num_points - i - 1) * discretization_distance_m) <= predicted_stopping_distance:
+                decelerating = True
+
+        speed = min(speed, speed_max)
+
+        if speed > 0:
+            seconds_delta = float(discretization_distance_m / speed)
+            seconds += seconds_delta
+            if decelerating:
+                speed -= stopping_decel * seconds_delta
+                speed = max(final_speed, speed)
+
+        # update heading
+        if i >= round(num_points * 0.2) and i < round(num_points * 0.6):
+            heading_angle -= heading_rate
+            heading_rate += heading_rate_increments
+            heading_rate = max(-heading_rate_max, min(heading_rate_max, heading_rate))
+        elif i >= round(num_points * 0.6) and i < round(num_points * 0.8):
+            heading_angle += heading_rate
+            heading_rate += heading_rate_increments
+            heading_rate = max(-heading_rate_max, min(heading_rate_max, heading_rate))
+            if heading_angle >= 0:
+                heading_angle = 0
+
+        # fillup trajectory point
+        trajectory_point = TrajectoryPoint()
+        trajectory_point.time_from_start = seconds
+
+        cur_x += discretization_m * np.cos(heading_angle)
+        cur_y += discretization_m * np.sin(heading_angle)
+        trajectory_point.x = cur_x
+        trajectory_point.y = cur_y
+        
+        trajectory_point.heading_rad = math.radians(heading_angle)
+        trajectory_point.longitudinal_velocity_mps = float(speed)
+        trajectory_point.acceleration_mps2 = (speed - prev_speed) / seconds
+        trajectory_point.heading_rate_rps = (heading_angle - prev_heading_angle) / seconds
+
+        trajectory_msg.points.append(trajectory_point)
+        # write into csv
+        # writing heading angle in degrees because Autoware's Heading requires conversion into Complex32 from degrees
+        writer.writerow([trajectory_point.time_from_start, trajectory_point.x, trajectory_point.y, heading_angle, trajectory_point.longitudinal_velocity_mps, trajectory_point.acceleration_mps2])
+
+        prev_heading_angle = heading_angle
+        prev_speed = speed
+
+    f.close()
+    return trajectory_msg  
 # higher curvature, lower speed than highway bend
 def create_junction_turning_trajectory():
     # set params for plot
@@ -598,7 +718,8 @@ def plot_trajectory(trajectory):
     plt.show()
 
 def get_trajectory():
-    return create_lane_change_trajectory()
+    # return create_lane_change_trajectory()
+    return create_lane_change_trajectory_discretization_pointfive()
     # return create_junction_turning_trajectory()
     # return create_highway_bend_trajectory()
 
